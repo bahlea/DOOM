@@ -149,6 +149,8 @@ byte*	I_AllocLow(int length)
     byte*	mem;
         
     mem = (byte *)malloc (length);
+    if (mem == NULL)
+      I_Error("I_AllocLow: Could not allocate %d bytes", length);
     memset (mem,0,length);
     return mem;
 }

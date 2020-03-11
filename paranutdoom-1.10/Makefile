@@ -4,24 +4,27 @@
 #
 # $Log:$
 #
-CC=  gcc  # gcc or g++
+CC=  riscv64-unknown-elf-gcc  # gcc or g++
 
-CFLAGS=-g -Wall -DNORMALUNIX -DLINUX # -DUSEASM 
-LDFLAGS=-L/usr/X11R6/lib
-LIBS=-lXext -lX11 -lnsl -lm
+RISCV_COMMON = $(PARANUT_HOME)/sw/riscv_common
+SYSTEMS_DIR = $(PARANUT_HOME)/systems
+
+CFLAGS=-O2 -g -march=rv32im -mabi=ilp32 -DNORMALUNIX # -DUSEASM 
+LDFLAGS= -march=rv32im -mabi=ilp32 -static -Ivears -nostartfiles $(RISCV_COMMON)/startup.S $(RISCV_COMMON)/syscalls.c -T $(RISCV_COMMON)/paranut.ld #-specs=de2.specs
+LIBS=-lm
 
 # subdirectory for objects
-O=linux
+O=paranut
 
 # not too sophisticated dependency
 OBJS=				\
 		$(O)/doomdef.o		\
 		$(O)/doomstat.o		\
 		$(O)/dstrings.o		\
+		$(O)/i_sound.o \
+		$(O)/i_video.o \
+		$(O)/i_net.o \
 		$(O)/i_system.o		\
-		$(O)/i_sound.o		\
-		$(O)/i_video.o		\
-		$(O)/i_net.o			\
 		$(O)/tables.o			\
 		$(O)/f_finale.o		\
 		$(O)/f_wipe.o 		\
@@ -76,19 +79,39 @@ OBJS=				\
 		$(O)/z_zone.o			\
 		$(O)/info.o				\
 		$(O)/sounds.o
+		
 
-all:	 $(O)/linuxxdoom
+all:	 $(O)/paranutdoom
 
 clean:
 	rm -f *.o *~ *.flc
-	rm -f linux/*
+	rm -f $(O)/*
 
-$(O)/linuxxdoom:	$(OBJS) $(O)/i_main.o
+$(O)/paranutdoom:	$(O) $(OBJS) $(O)/i_main.o
 	$(CC) $(CFLAGS) $(LDFLAGS) $(OBJS) $(O)/i_main.o \
-	-o $(O)/linuxxdoom $(LIBS)
+	-o $(O)/paranutdoom $(LIBS)
 
 $(O)/%.o:	%.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(O)/%.o:	vears/%.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(O): 
+	mkdir $@
+
+.PHONY: bin
+bin: $(O)/paranutdoom.bin
+$(O)/paranutdoom.bin: $(O)/paranutdoom
+	riscv64-unknown-elf-objcopy -S -O binary $< $@
+
+.PHONY: flash-%
+flash-%: bin
+	paranut_flash -c -p $(O)/paranutdoom.bin $(SYSTEMS_DIR)/$*/hardware/build/system.hdf $(SYSTEMS_DIR)/$*/hardware/firmware/firmware.elf
+	
+flash-%-bit: bin
+	paranut_flash -c -b $(SYSTEMS_DIR)/$*/hardware/build/system.bit -p $(O)/paranutdoom.bin \
+	                               $(SYSTEMS_DIR)/$*/hardware/build/system.hdf $(SYSTEMS_DIR)/$*/hardware/firmware/firmware.elf
 
 #############################################################
 #
